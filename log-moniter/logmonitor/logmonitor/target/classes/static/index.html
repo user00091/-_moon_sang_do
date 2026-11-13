@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>로그 이상 데이터 자동 정제기</title>
+    <style>
+        :root {
+            --bg: #fafaf8;
+            --card: #fff;
+            --tx: #1f2328;
+            --mut: #6b7280;
+            --bd: #e5e7eb;
+            --ac: #2563eb;
+            --bad: #dc2626;
+            --ok: #16a34a;
+            --warn: #d97706;
+            color-scheme: light;
+            box-sizing: border-box;
+            padding-top: env(safe-area-inset-top,0px);
+            padding-bottom: env(safe-area-inset-bottom,0px)
+        }
+
+        @media (prefers-color-scheme:dark) {
+            :root:not([data-theme="light"]) {
+                --bg: #16181c;
+                --card: #1f2228;
+                --tx: #e6e8eb;
+                --mut: #9aa3af;
+                --bd: #2f343c;
+                --ac: #60a5fa;
+                --bad: #f87171;
+                --ok: #4ade80;
+                --warn: #fbbf24;
+                color-scheme: dark
+            }
+        }
+
+        :root[data-theme="dark"] {
+            --bg: #16181c;
+            --card: #1f2228;
+            --tx: #e6e8eb;
+            --mut: #9aa3af;
+            --bd: #2f343c;
+            --ac: #60a5fa;
+            --bad: #f87171;
+            --ok: #4ade80;
+            --warn: #fbbf24;
+            color-scheme: dark
+        }
+
+        html {
+            scroll-padding-top: env(safe-area-inset-top,0px)
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--tx);
+            font: 15px/1.55 system-ui,-apple-system,"Segoe UI","Noto Sans KR","Malgun Gothic",sans-serif
+        }
+
+        main {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 20px 16px 40px
+        }
+
+        h1 {
+            font-size: 21px;
+            margin: 0 0 4px
+        }
+
+        h2 {
+            font-size: 16px;
+            margin: 0 0 10px
+        }
+
+        .sub {
+            color: var(--mut);
+            margin: 0 0 16px
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--bd);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 14px
+        }
+
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 90px;
+            background: var(--bg);
+            color: var(--tx);
+            border: 1px solid var(--bd);
+            border-radius: 8px;
+            padding: 8px;
+            font: 12px/1.4 ui-monospace,Consolas,monospace
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px
+        }
+
+        button {
+            background: var(--ac);
+            color: #fff;
+            border: 0;
+            border-radius: 8px;
+            padding: 9px 14px;
+            font: inherit;
+            cursor: pointer
+        }
+
+            button.alt {
+                background: transparent;
+                color: var(--ac);
+                border: 1px solid var(--ac)
+            }
+
+        input[type=number] {
+            width: 70px;
+            background: var(--bg);
+            color: var(--tx);
+            border: 1px solid var(--bd);
+            border-radius: 6px;
+            padding: 6px
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit,minmax(130px,1fr));
+            gap: 10px
+        }
+
+        .stat {
+            background: var(--card);
+            border: 1px solid var(--bd);
+            border-radius: 10px;
+            padding: 10px 12px
+        }
+
+            .stat b {
+                display: block;
+                font-size: 22px
+            }
+
+            .stat span {
+                color: var(--mut);
+                font-size: 12px
+            }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px
+        }
+
+        th, td {
+            text-align: left;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--bd)
+        }
+
+        th {
+            color: var(--mut);
+            font-weight: 600
+        }
+
+        .scroll {
+            overflow-x: auto
+        }
+
+        .chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 130px;
+            min-width: 520px
+        }
+
+        .bar {
+            flex: 1;
+            background: var(--ac);
+            opacity: .55;
+            border-radius: 2px 2px 0 0;
+            min-width: 3px
+        }
+
+            .bar.a {
+                background: var(--bad);
+                opacity: 1
+            }
+
+        .tag {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 9px;
+            font-size: 12px;
+            background: var(--bd)
+        }
+
+            .tag.bad {
+                background: var(--bad);
+                color: #fff
+            }
+
+        code {
+            font: 12px ui-monospace,Consolas,monospace;
+            word-break: break-all
+        }
+
+        .mut {
+            color: var(--mut);
+            font-size: 12px
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>🧹 로그 이상 데이터 자동 정제기</h1>
+        <p class="sub">규칙 기반 정제 → 통계 기반 이상 구간 탐지 → 로그 패턴 탐지. 모든 처리는 브라우저 안에서만 이루어지며 데이터가 외부로 전송되지 않습니다.</p>
+
+        <div class="card">
+            <h2>입력</h2>
+            <textarea id="inp" placeholder='내 로그를 한 줄에 JSON 하나씩 붙여넣으세요 (예: {"ts":"2026-11-09T10:00:00","level":"INFO","service":"auth","msg":"login ok"}). 비워 두고 샘플 실행도 가능합니다.'></textarea>
+            <div class="row">
+                <button id="runSample">샘플 데이터로 실행</button>
+                <button id="runMine" class="alt">붙여넣은 로그로 실행</button>
+                <label class="mut">이상 임계값(Z) <input id="th" type="number" step="0.5" min="1" value="3.5"></label>
+            </div>
+        </div>
+
+        <div id="out"></div>
+    </main>
+    <script>
+        const REQUIRED=["ts","level","service","msg"],LEVELS=new Set(["DEBUG","INFO","WARN","ERROR","FATAL"]),MAXLEN=2000;
+        const PII=[[/\b\d{4}-\d{4}-\d{4}-\d{4}\b/g,"[CARD]"],[/\b\d{6}-[1-4]\d{6}\b/g,"[RRN]"],[/[\w.+-]+@[\w-]+\.[\w.]+/g,"[EMAIL]"],[/bearer\s+[a-z0-9._-]{10,}/gi,"Bearer [TOKEN]"]];
+        const REASON={duplicate:"중복",future_timestamp:"미래 시간",missing_field:"필수 필드 누락",parse_error:"JSON 파싱 실패",bad_timestamp:"시간 형식 오류",too_long:"초과 길이",invalid_level:"알 수 없는 level"};
+        const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+        const $=id=>document.getElementById(id);
+
+        /* ---------- 샘플 생성 ---------- */
+        function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+        const iso=ms=>new Date(ms-new Date(ms).getTimezoneOffset()*60000).toISOString().slice(0,19);
+        function sample(){
+        const r=rng(42),ri=(a,b)=>a+Math.floor(r()*(b-a+1)),pick=a=>a[Math.floor(r()*a.length)];
+        const start=Math.floor((Date.now()-130*60000)/60000)*60000,svc=["auth","payment","gateway"],L=[];
+        for(let m=0;m<120;m++){
+        let n=ri(35,45),er=.03;
+        if(m>=80&&m<90){n=ri(150,200);er=.45}
+        if(m>=40&&m<43)n=ri(0,3);
+        for(let i=0;i<n;i++){
+        const ts=iso(start+m*60000+ri(0,59)*1000),u=ri(1000,9999);
+        const lv=r()<er?"ERROR":pick(["INFO","INFO","INFO","INFO","INFO","INFO","INFO","INFO","DEBUG","WARN"]);
+        const msg=lv==="ERROR"?pick([`DB connection timeout after ${ri(1,30)}s user=${u}`,`payment failed order=${ri(1e5,1e6)} code=E${ri(100,999)}`])
+        :pick([`login ok user=${u} ip=10.0.${ri(0,9)}.${ri(1,254)}`,`request GET /api/items/${ri(1,500)} 200 ${ri(5,300)}ms`,`cache hit key=item:${ri(1,500)}`]);
+        L.push(JSON.stringify({ts,level:lv,service:pick(svc),msg}));
+        }
+        }
+        const t0=iso(start+30*60000),j=o=>JSON.stringify(o);
+        L.push("this is not json at all",
+        j({ts:t0,level:"INFO",service:"auth"}),
+        j({ts:"09/11/2026 10:00",level:"INFO",service:"auth",msg:"bad ts format"}),
+        j({ts:"2031-01-01T00:00:00",level:"INFO",service:"auth",msg:"future ts"}),
+        j({ts:t0,level:"VERBOSE!!",service:"auth",msg:"weird level"}),
+        j({ts:t0,level:"INFO",service:"auth",msg:"x".repeat(3000)}),
+        j({ts:t0,level:"INFO",service:"payment",msg:"card=4111-1111-1111-1111 rrn=900101-1234567 email=kim@example.com token=Bearer abcdef1234567890abcdef"}),
+        j({ts:t0,level:"WARN",service:"gateway",msg:"unexpected schema version 99 from upstream partner"}));
+        const d=L[ri(0,199)];for(let i=0;i<20;i++)L.push(d);
+        for(let i=L.length-1;i>0;i--){const k=Math.floor(r()*(i+1));[L[i],L[k]]=[L[k],L[i]]}
+        return L;
+        }
+
+        /* ---------- 1. 규칙 기반 정제 ---------- */
+        function clean(lines){
+        const ok=[],q=[],stats={},seen=new Set(),now=Date.now()+5*60000;let masked=0;
+        const rej=(raw,why)=>{stats[why]=(stats[why]||0)+1;q.push({reason:why,raw:raw.slice(0,200)})};
+        for(const raw of lines){
+        if(raw.length>MAXLEN){rej(raw,"too_long");continue}
+        let rec;try{rec=JSON.parse(raw);if(!rec||typeof rec!=="object"||Array.isArray(rec))throw 0}catch{rej(raw,"parse_error");continue}
+        if(REQUIRED.some(k=>!rec[k])){rej(raw,"missing_field");continue}
+        const ts=/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(String(rec.ts))?new Date(rec.ts).getTime():NaN;
+        if(isNaN(ts)){rej(raw,"bad_timestamp");continue}
+        if(ts>now){rej(raw,"future_timestamp");continue}
+        if(!LEVELS.has(rec.level)){rej(raw,"invalid_level");continue}
+        if(seen.has(raw)){rej(raw,"duplicate");continue}
+        seen.add(raw);
+        let m=String(rec.msg),hit=false;
+        for(const[p,rep]of PII){const n=m.replace(p,rep);if(n!==m)hit=true;m=n}
+        if(hit)masked++;
+        ok.push({...rec,msg:m,_t:ts});
+        }
+        return{ok,q,stats,masked};
+        }
+
+        /* ---------- 2. 통계 기반 탐지 (median/MAD) ---------- */
+        const med=a=>{const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
+        function robustZ(v){const m=med(v),mad=med(v.map(x=>Math.abs(x-m)))||1e-9;return{z:v.map(x=>0.6745*(x-m)/mad),m}}
+        function volume(ok,th){
+        if(!ok.length)return{rows:[],med:0};
+        const b=new Map();
+        for(const r of ok){const k=Math.floor(r._t/60000),o=b.get(k)||{t:0,e:0};o.t++;if(r.level==="ERROR"||r.level==="FATAL")o.e++;b.set(k,o)}
+        const ks=[...b.keys()],lo=Math.min(...ks),hi=Math.max(...ks),rows=[];
+        for(let k=lo;k<=hi;k++){const o=b.get(k);rows.push({k,t:o?o.t:0,e:o&&o.t?o.e/o.t:0})}
+        const zt=robustZ(rows.map(r=>r.t)),ze=robustZ(rows.map(r=>r.e));
+        rows.forEach((r,i)=>{r.why=[];if(Math.abs(zt.z[i])>th)r.why.push(zt.z[i]>0?"로그량 급증":"로그량 급감");if(ze.z[i]>th)r.why.push("에러율 급증")});
+        return{rows,med:zt.m};
+        }
+
+        /* ---------- 3. 패턴(템플릿) 탐지 ---------- */
+        const tpl=m=>m.replace(/(?<==)[^\s]+/g,"<*>").replace(/\/\d+/g,"/<*>").replace(/\b[0-9a-f]{8,}\b/gi,"<*>").replace(/\d+/g,"<*>");
+        function patterns(ok){
+        const c=new Map();ok.forEach(r=>{const t=tpl(r.msg);c.set(t,(c.get(t)||0)+1)});
+        return{total:c.size,rare:[...c].filter(([,n])=>n<=2||n/ok.length<=0.0005)};
+        }
+
+        /* ---------- 실행 및 렌더링 ---------- */
+        function run(lines){
+        const th=parseFloat($("th").value)||3.5,{ok,q,stats,masked}=clean(lines),v=volume(ok,th),p=patterns(ok);
+        const an=v.rows.filter(r=>r.why.length),mx=Math.max(1,...v.rows.map(r=>r.t));
+        const hm=k=>new Date(k*60000).toTimeString().slice(0,5);
+        const reasons=Object.entries(stats).sort((a,b)=>b[1]-a[1]);
+        $("out").innerHTML=`
+        <div class="stats">
+        <div class="stat"><b>${lines.length.toLocaleString()}</b><span>원본 로그</span></div>
+        <div class="stat"><b style="color:var(--ok)">${ok.length.toLocaleString()}</b><span>정상 통과</span></div>
+        <div class="stat"><b style="color:var(--bad)">${q.length.toLocaleString()}</b><span>격리(quarantine)</span></div>
+        <div class="stat"><b>${masked}</b><span>민감정보 마스킹</span></div>
+        <div class="stat"><b style="color:var(--warn)">${an.length}</b><span>이상 구간(분)</span></div>
+        </div>
+        <div class="card" style="margin-top:14px"><h2>1단계 · 격리 사유</h2>
+        ${reasons.length?`<table><tr><th>사유</th><th>건수</th></tr>${reasons.map(([k,n])=>`<tr><td>${REASON[k]||k} <span class="mut">(${k})</span></td><td>${n}</td></tr>`).join("")}</table>`:'<p class="mut">격리된 로그가 없습니다.</p>'}
+        ${q.length?`<details style="margin-top:8px"><summary class="mut">격리된 로그 원문 보기 (최대 30건)</summary>${q.slice(0,30).map(x=>`<div><span class="tag">${x.reason}</span> <code>${esc(x.raw)}</code></div>`).join("")}</details>`:""}
+        </div>
+        <div class="card"><h2>2단계 · 분당 로그량 (빨간색 = 이상 구간)</h2>
+        <div class="scroll"><div class="chart">${v.rows.map(r=>`<div class="bar${r.why.length?" a":""}" style="height:${Math.max(2,r.t/mx*100)}%" title="${hm(r.k)} · ${r.t}건 · 에러율 ${Math.round(r.e*100)}%"></div>`).join("")}</div></div>
+        <p class="mut">중앙값 ${v.med}건/분 · 임계값 Z>${th}</p>
+        ${an.length?`<div class="scroll"><table><tr><th>시각</th><th>건수</th><th>에러율</th><th>판정</th></tr>${an.map(r=>`<tr><td>${hm(r.k)}</td><td>${r.t}</td><td>${Math.round(r.e*100)}%</td><td>${r.why.map(w=>`<span class="tag bad">${w}</span>`).join(" ")}</td></tr>`).join("")}</table></div>`:'<p class="mut">이상 구간이 없습니다.</p>'}
+        </div>
+        <div class="card"><h2>3단계 · 로그 패턴</h2>
+        <p class="mut">템플릿 ${p.total}종 추출 · 희귀/신규 패턴 ${p.rare.length}종</p>
+        ${p.rare.slice(0,20).map(([t,n])=>`<div><span class="tag">${n}건</span> <code>${esc(t)}</code></div>`).join("")}
+        </div>`;
+        }
+        $("runSample").onclick=()=>run(sample());
+        $("runMine").onclick=()=>{const l=$("inp").value.split("\n").map(s=>s.trim()).filter(Boolean);l.length?run(l):alert("로그를 먼저 붙여넣어 주세요.")};
+        run(sample());
+    </script>
+</body>
+</html>
