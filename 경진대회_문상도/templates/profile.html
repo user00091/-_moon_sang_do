@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="title">
+    환영합니다, {{ name }}!
+</h1>
+
+<a class="button is-info is-large" href="{{ url_for('cleaner.index') }}">
+    로그 정제기 열기
+</a>
+{% endblock %}

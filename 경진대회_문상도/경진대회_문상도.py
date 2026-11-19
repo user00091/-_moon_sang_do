@@ -9,9 +9,10 @@ import time
 from datetime import datetime
 
 # 1. 플라스크 임포트 부분에 render_template_string을 정확히 포함시킵니다.
-from flask import Flask, render_template_string, request, jsonify
+from flask import Blueprint, render_template_string, request, jsonify
+from flask_login import login_required
 
-app = Flask(__name__)
+cleaner = Blueprint("cleaner", __name__)
 
 REQUIRED = ["ts", "level", "service", "msg"]
 LEVELS = {"DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
@@ -188,7 +189,8 @@ def make_sample():
 
 
 # 3. Flask 웹 라우트 설정
-@app.route("/")
+@cleaner.route("/cleaner")
+@login_required
 def index():
     return render_template_string("""
 <!DOCTYPE html>
@@ -272,7 +274,8 @@ async function runCleaner(isSample) {
 </html>
     """)
 
-@app.route("/run", methods=["POST"])
+@cleaner.route("/run", methods=["POST"])
+@login_required
 def run_web():
     req = request.json
     if req.get("is_sample"):
@@ -292,6 +295,3 @@ def run_web():
         "masked_count": masked,
         "anomalies": anomalies
     })
-
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)

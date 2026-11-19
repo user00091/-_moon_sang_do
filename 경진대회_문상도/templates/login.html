@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="column is-4 is-offset-4">
+    <h3 class="title">로그인</h3>
+    <div class="box">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="notification is-danger">
+            {% for message in messages %}
+                {% if message == 'Please log in to access this page.' %}
+                    이 페이지를 보려면 로그인해 주세요.
+                {% elif message == 'Please sign up before!' %}
+                    먼저 회원가입해 주세요.
+                {% elif message == 'Please check your login details and try again.' %}
+                    이메일 또는 비밀번호를 확인해 주세요.
+                {% elif message == 'Email address already exists' %}
+                    이미 사용 중인 이메일 주소입니다.
+                {% else %}
+                    {{ message }}
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        <form method="POST" action="/login">
+            <div class="field">
+                <div class="control">
+                    <input class="input is-large" type="email" name="email" placeholder="이메일" autofocus="">
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="control">
+                    <input class="input is-large" type="password" name="password" placeholder="비밀번호">
+                </div>
+            </div>
+            <div class="field">
+                <label class="checkbox">
+                    <input type="checkbox" name="remember">
+                    저장하기
+                </label>
+            </div>
+            <button class="button is-block is-info is-large is-fullwidth">로그인</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
