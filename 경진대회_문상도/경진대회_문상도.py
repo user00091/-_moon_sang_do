@@ -148,13 +148,17 @@ def clean_logs(lines):
     seen = set()
     now = int(time.time()) + 5 * 60
 
-    def reject(raw, reason):
+    def reject(raw, reason, line_number):
         stats[reason] = stats.get(reason, 0) + 1
-        quarantine.append({"reason": reason, "raw": raw})
+        quarantine.append({
+            "reason": reason,
+            "raw": raw,
+            "line": line_number,
+        })
 
-    for raw in lines:
+    for line_number, raw in enumerate(lines, start=1):
         if len(raw.encode("utf-8", errors="replace")) > MAXLEN:
-            reject(raw, "too_long")
+            reject(raw, "too_long", line_number)
             continue
 
         try:
@@ -163,33 +167,34 @@ def clean_logs(lines):
             record = None
 
         if not isinstance(record, dict):
-            reject(raw, "parse_error")
+            reject(raw, "parse_error", line_number)
             continue
 
         if not all(truthy(record.get(key)) for key in REQUIRED):
-            reject(raw, "missing_field")
+            reject(raw, "missing_field", line_number)
             continue
 
         timestamp = parse_ts(record["ts"])
         if timestamp is None:
-            reject(raw, "bad_timestamp")
+            reject(raw, "bad_timestamp", line_number)
             continue
 
         if timestamp > now:
-            reject(raw, "future_timestamp")
+            reject(raw, "future_timestamp", line_number)
             continue
 
         level = record["level"]
         if not isinstance(level, str) or level not in LEVELS:
-            reject(raw, "invalid_level")
+            reject(raw, "invalid_level", line_number)
             continue
 
         if raw in seen:
-            reject(raw, "duplicate")
+            reject(raw, "duplicate", line_number)
             continue
         seen.add(raw)
 
-        message = record["msg"]
+        original_msg = record["msg"]
+        message = original_msg
         if not isinstance(message, str):
             message = json.dumps(message, ensure_ascii=False)
 
@@ -207,9 +212,12 @@ def clean_logs(lines):
         ok.append({
             "raw": raw,
             "rec": record,
+            "original_msg": original_msg,
             "t": timestamp,
             "msg": message,
             "level": level,
+            "masked": hit,
+            "line": line_number,
         })
 
     return ok, quarantine, stats, masked
@@ -761,6 +769,10 @@ h4.sub { margin: 18px 0 8px; font-size: 15px; }
     </div>
     <div id="detail" class="hint" style="margin-top:14px;font-size:13px;"></div>
     <div id="downloads" style="margin-top:16px;"></div>
+    <h4 class="sub">격리 로그 상세</h4>
+    <div id="quarantineWrap" style="overflow-x:auto;"></div>
+    <h4 class="sub">마스킹 전·후 비교</h4>
+    <div id="maskedWrap" style="overflow-x:auto;"></div>
     <h4 class="sub" id="segTitle" style="display:none;">🚨 이상 구간 (연속된 구간은 하나로 묶음)</h4>
     <div id="segWrap" style="overflow-x:auto;"></div>
     <details id="minWrap" style="margin-top:14px;display:none;">
@@ -810,6 +822,45 @@ function renderDetail(data) {
         parts.push('격리 사유: ' + statKeys.map(key => key + ' ' + stats[key] + '건').join(', '));
     }
     document.getElementById('detail').textContent = parts.join('  |  ');
+
+    const quarantineWrap = document.getElementById('quarantineWrap');
+    quarantineWrap.textContent = '';
+
+    const quarantineDetails = data.quarantine_details || [];
+    if (quarantineDetails.length) {
+        const quarantineTable = makeTable(['입력 줄', '격리 사유', '원문']);
+
+        quarantineDetails.forEach(item => {
+            const row = quarantineTable.insertRow();
+            [item.line, item.reason, item.raw].forEach(value => {
+                row.insertCell().textContent = value;
+            });
+        });
+
+        quarantineWrap.appendChild(quarantineTable);
+    } else {
+        quarantineWrap.textContent = '격리된 로그가 없습니다.';
+    }
+
+    // 마스킹 전·후 비교 표시
+    const maskedWrap = document.getElementById('maskedWrap');
+    maskedWrap.textContent = '';
+
+    const maskedDetails = data.masked_details || [];
+    if (maskedDetails.length) {
+        const maskedTable = makeTable(['입력 줄', '마스킹 전', '마스킹 후']);
+
+        maskedDetails.forEach(item => {
+            const row = maskedTable.insertRow();
+            [item.line, item.before, item.after].forEach(value => {
+                row.insertCell().textContent = value;
+            });
+        });
+
+        maskedWrap.appendChild(maskedTable);
+    } else {
+        maskedWrap.textContent = '마스킹된 로그가 없습니다.';
+    }
 
     const downloads = document.getElementById('downloads');
     downloads.textContent = '';
@@ -1094,6 +1145,22 @@ def run_web():
         "max_z": round(max_z, 2),
         "th": threshold,
         "stats": {REASON.get(key, key): value for key, value in stats.items()},
+        "quarantine_details": [
+            {
+                "line": item["line"],
+                "reason": REASON.get(item["reason"], item["reason"]),
+                "raw": item["raw"],
+            }
+            for item in quarantine[:200]
+        ],
+        "masked_details": [
+            {
+                "line": item["line"],
+                "before": str(item["original_msg"]),
+                "after": item["msg"],
+            }
+            for item in ok if item["masked"]
+        ][:200],
         "counts": {
             "clean": len(ok),
             "quarantine": len(quarantine),
