@@ -718,6 +718,8 @@ h4.sub { margin: 18px 0 8px; font-size: 15px; }
 }
 </style>
 </head>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 <body>
 
 <h1>🧹 로그 이상 데이터 자동 정제기</h1>
@@ -768,6 +770,10 @@ h4.sub { margin: 18px 0 8px; font-size: 15px; }
         <div class="metric-box"><div class="label">이상 구간</div><div id="mAnomalies" class="value">0</div></div>
     </div>
     <div id="detail" class="hint" style="margin-top:14px;font-size:13px;"></div>
+    <div class="card" style="margin-top:16px;">
+    <h4 class="sub">시간대별 로그량 및 에러율</h4>
+    <canvas id="logChart"></canvas>
+    </div>
     <div id="downloads" style="margin-top:16px;"></div>
     <h4 class="sub">격리 로그 상세</h4>
     <div id="quarantineWrap" style="overflow-x:auto;"></div>
@@ -779,6 +785,7 @@ h4.sub { margin: 18px 0 8px; font-size: 15px; }
         <summary style="cursor:pointer;font-size:13px;color:#475569;">분 단위 상세 보기</summary>
         <div id="anomalyWrap" style="overflow-x:auto;margin-top:8px;"></div>
     </details>
+    
 </div>
 
 <script>
@@ -950,7 +957,83 @@ function renderDetail(data) {
         anomalyWrap.appendChild(table);
     }
 }
+let logChart = null;
 
+function renderChart(rows) {
+    const canvas = document.getElementById('logChart');
+    if (!canvas) return;
+
+    if (logChart) {
+        logChart.destroy();
+    }
+
+    const labels = rows.map(row =>
+        new Date(row.time).toLocaleTimeString('ko-KR', {
+            hour: '2-digit',
+            minute: '2-digit'
+        })
+    );
+    const anomalies = rows.map(row => row.is_anomaly ? row.count : null);
+
+    logChart = new Chart(canvas, {
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    type: 'bar',
+                    label: '분당 로그 건수',
+                    data: rows.map(row => row.count),
+                    yAxisID: 'y',
+                    backgroundColor: 'rgba(37, 99, 235, 0.35)',
+                    borderColor: '#2563eb',
+                    borderWidth: 1
+                },
+                {
+                    type: 'line',
+                    label: '에러율 (%)',
+                    data: rows.map(row => row.error_rate),
+                    yAxisID: 'y1',
+                    borderColor: '#dc2626',
+                    backgroundColor: '#dc2626',
+                    pointRadius: 2,
+                    tension: 0.2
+                },
+                {
+                    type: 'line',
+                    label: '이상 구간',
+                    data: anomalies,
+                    yAxisID: 'y',
+                    borderColor: '#d97706',
+                    backgroundColor: '#d97706',
+                    pointRadius: 5,
+                    showLine: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: '시각' }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: '로그 건수' }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: { display: true, text: '에러율 (%)' },
+                    grid: { drawOnChartArea: false }
+                }
+            }
+        }
+    });
+}
 async function runCleaner(mode) {
     const formData = new FormData();
     formData.append('mode', mode);
@@ -1002,6 +1085,7 @@ async function runCleaner(mode) {
         document.getElementById('mAnomalies').textContent = data.anomalies + '개';
 
         renderDetail(data);
+        renderChart(data.chart_rows || []);
         setStatus('완료되었습니다.', false);
     } catch (error) {
         setStatus('서버에 연결하지 못했습니다: ' + error, true);
@@ -1137,6 +1221,15 @@ def run_web():
         "masked_count": masked,
         "anomalies": len(anomaly_rows),
         "anomaly_rows": anomaly_rows[:200],
+        "chart_rows": [
+            {
+                "time": row["k"] * 60 * 1000,
+                "count": row["t"],
+                "error_rate": round(row["e"] * 100, 2),
+                "is_anomaly": bool(row["why"]),
+            }
+            for row in rows
+        ],
         "segments": [
             {key: value for key, value in segment.items() if key not in ("k0", "k1")}
             for segment in segments[:100]
