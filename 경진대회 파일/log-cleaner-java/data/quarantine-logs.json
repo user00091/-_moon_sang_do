@@ -1,0 +1,19 @@
+[ {
+  "id" : "61e7fbe8-6e43-4e53-99cf-9409247e0a69",
+  "reason" : "invalid_level",
+  "raw" : "{\"ts\":\"2026-11-19T10:01:00\",\"level\":\"INVALID\",\"service\":\"auth\",\"msg\":\"bad level\"}",
+  "status" : "REPROCESSED",
+  "createdAt" : "2026-11-19T11:34:37.280049300Z"
+}, {
+  "id" : "cb18c0a6-fa85-4238-ba3e-296750fe3147",
+  "reason" : "invalid_level",
+  "raw" : "{\"ts\":\"2026-11-19T10:01:00\",\"level\":\"INVALID\",\"service\":\"auth\",\"msg\":\"bad level\"}",
+  "status" : "REPROCESSED",
+  "createdAt" : "2026-11-19T11:41:28.792780700Z"
+}, {
+  "id" : "b08d5a11-c1b6-4690-96af-547d7fce24ee",
+  "reason" : "invalid_level",
+  "raw" : "{\"ts\":\"2026-11-19T10:06:00\",\"level\":\"UNKNOWN\",\"service\":\"payment\",\"msg\":\"weird status\"}",
+  "status" : "QUARANTINED",
+  "createdAt" : "2026-11-20T06:05:10.226418300Z"
+} ]

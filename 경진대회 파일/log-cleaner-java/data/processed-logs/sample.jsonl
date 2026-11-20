@@ -1,0 +1,2 @@
+{"ts":"2026-11-19T10:05:00","level":"INFO","service":"gateway","msg":"health ok"}
+{"ts":"2026-11-19T10:06:00","level":"UNKNOWN","service":"payment","msg":"weird status"}
